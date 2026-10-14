@@ -9,6 +9,11 @@ from .errors import CedaError
 
 
 def main(argv=None):
+    # Windows pipes may otherwise use a locale encoding that cannot represent
+    # Chinese diagnostics. Frozen windowed applications can have no streams.
+    for stream in (sys.stdout,sys.stderr):
+        if stream is not None and hasattr(stream,"reconfigure"):
+            stream.reconfigure(encoding="utf-8",errors="backslashreplace")
     parser = argparse.ArgumentParser(prog="ceda",description="Ceda local PCB analysis workbench")
     sub = parser.add_subparsers(dest="command")
     gui = sub.add_parser("gui",help="Open desktop workbench")
