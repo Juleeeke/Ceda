@@ -1,0 +1,26 @@
+# v0.1 local verification record
+
+Date: 2026-10-14. Execution: macOS 27 / ARM64, Python 3.12.14. Dependency installation was isolated in `.venv`; versions are recorded in `uv.lock`.
+
+## Completed locally
+
+- 29 tests passed. Includes PCB fill/rotation/cutout handling; explicit unsupported-geometry failures; full-width copper strip vs analytic loop resistance; neck vs wide-plane comparison; physical disconnect rejection; local ground shift; explicit via barrel resistance; node budget; finite input validation; power/thermal conservation; report input hash; netlist mismatch; ngspice startup bridge; desktop worker and screenshot.
+- `uv sync --frozen --extra dev --offline` completed against cached dependencies, followed by 29 passing tests.
+- Python source compilation completed.
+- macOS ARM `Ceda.app` built with PyInstaller; both packaged CLI and packaged desktop worker ran the synthetic demo successfully.
+- Packaged and source demo yielded identical load voltage: **3.292066123708791 V** at 0.5 A from a 3.3 V ideal source.
+- Demo's threshold is deliberately 3.295 V: the correct engineering verdict is **fail**, not a program failure.
+- Fine mesh: 3,617 nodes / 6,686 triangles. 0.5 mm→0.25 mm load-voltage difference: 0.0000500098 V. Total copper loss: 0.0039669381 W. Relative electrical power imbalance: 2.6625e-10.
+- Optional ngspice single-port layout-R / RC transient generated 2,024 samples. Final load voltage: 3.29206612 V. Extracted loop R: 0.0158677526 Ω.
+
+The native macOS window was also opened successfully. Terminal, offscreen Qt and native-window checks validate execution/rendering, not full user acceptance or hardware accuracy. The screenshot below comes from a completed analysis, not a mockup.
+
+![Ceda desktop workbench](images/workbench.png)
+
+## Outstanding evidence
+
+- Windows/Linux CI jobs are configured but have not run in this local session.
+- No fabricated-board measurement or model calibration has been performed.
+- No official full KiCad DRC/ERC pass is claimed. The current machine's KiCad application folder contains broken application links; native PCB parsing does not depend on that installation.
+- Thermal output is an experimental thickness-averaged model; passing energy balance does not validate junction temperatures or real convection accuracy.
+- The app is a local development build with ad-hoc signing, not a notarized public release or a license-complete redistribution package.

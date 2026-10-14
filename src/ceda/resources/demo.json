@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "3.3V MCU / narrow copper neck",
+  "sources": [{"positive":"J1.1", "negative":"J1.2", "voltage_v":3.3}],
+  "loads": [{"positive":"U1.1", "negative":"U1.2", "current_a":0.5, "minimum_voltage_v":3.295, "label":"MCU power pins"}],
+  "settings": {
+    "mesh_size_mm":0.5, "max_nodes":150000,
+    "resistivity_ohm_m":1.724e-8, "ambient_c":25,
+    "mesh_refinement":true,
+    "thermal_enabled":false
+  }
+}

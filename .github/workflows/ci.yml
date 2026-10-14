@@ -1,0 +1,32 @@
+name: Cross-platform core and desktop checks
+on: [push, pull_request]
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        python: ["3.12"]
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Linux native libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libglu1-mesa libegl1 libxkbcommon0 ngspice
+      - name: Install
+        run: |
+          python -m pip install uv
+          uv sync --frozen --extra dev
+      - name: Test
+        run: uv run --no-sync python -m pytest -q
+      - name: Demo
+        run: uv run --no-sync python -m ceda demo --output outputs/demo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ceda-demo-${{ runner.os }}
+          path: outputs/demo/
