@@ -33,7 +33,7 @@ class BoardView(QGraphicsView):
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-        self.setBackgroundBrush(QColor("#111c28"))
+        self.setBackgroundBrush(QColor("#ffffff"))
         self.board = None
         self.report = None
         self.layer = "F.Cu"
@@ -50,17 +50,17 @@ class BoardView(QGraphicsView):
         scene.clear()
         if self.board is None:
             text = scene.addText("导入 KiCad PCB，或打开演示板\n选择真实供电与回流焊盘后开始分析")
-            text.setDefaultTextColor(QColor("#a8bdcc"))
+            text.setDefaultTextColor(QColor("#929ca9"))
             self.fitInView(scene.itemsBoundingRect(),Qt.AspectRatioMode.KeepAspectRatio)
             return
         if self.board.outline is not None:
-            scene.addPath(painter_path(self.board.outline),QPen(QColor("#627b87"),0.07),QColor("#1b2b38"))
+            scene.addPath(painter_path(self.board.outline),QPen(QColor("#bbc3cf"),0.045),QColor("#fafbfc"))
         for (net,layer),shape in self.board.copper.items():
             if layer == self.layer:
-                item = scene.addPath(painter_path(shape),QPen(Qt.PenStyle.NoPen),QColor("#3b596a"))
+                item = scene.addPath(painter_path(shape),QPen(Qt.PenStyle.NoPen),QColor("#b6c7d4"))
                 item.setToolTip(f"{net} / {layer} · {shape.area:.3f} mm²")
         self.range_text = "几何预览 · 尚未求解"
-        if self.report:
+        if self.report and self.field != "geometry":
             if self.field == "temperature" and self.report.get("thermal"):
                 mesh = self.report["thermal"]
                 triangles = mesh["triangles"]
@@ -84,18 +84,18 @@ class BoardView(QGraphicsView):
         for pad in self.board.pads:
             if self.layer not in pad.layers:
                 continue
-            item = scene.addPath(painter_path(pad.geometry),QPen(QColor("#f7daa1"),0.045))
+            item = scene.addPath(painter_path(pad.geometry),QPen(QColor("#778394"),0.035))
             item.setData(0,pad.id)
             item.setToolTip(f"{pad.id} / {pad.net}")
             text = scene.addText(pad.id)
             text.setScale(0.05)
             text.setPos(pad.x+0.2,pad.y-0.7)
-            text.setDefaultTextColor(QColor("#f0f3f6"))
+            text.setDefaultTextColor(QColor("#535f70"))
             text.setData(0,pad.id)
         if self.selected_pad:
             pad = self.board.pad(self.selected_pad)
             if self.layer in pad.layers:
-                scene.addPath(painter_path(pad.geometry.buffer(0.1)),QPen(QColor("#ffffff"),0.08))
+                scene.addPath(painter_path(pad.geometry.buffer(0.1)),QPen(QColor("#4671b6"),0.06))
         scene.setSceneRect(scene.itemsBoundingRect().adjusted(-1,-1,1,1))
         if fit:
             self.fitInView(scene.sceneRect(),Qt.AspectRatioMode.KeepAspectRatio)

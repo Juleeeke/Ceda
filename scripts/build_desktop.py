@@ -11,12 +11,16 @@ from pathlib import Path
 import gmsh
 
 root = Path(__file__).resolve().parents[1]
+icon_directory=root/"src"/"ceda"/"resources"/"icons"
+icon_path=icon_directory/("ceda.icns" if sys.platform=="darwin" else "ceda.ico" if sys.platform=="win32" else "ceda-icon.png")
+if not icon_path.is_file():
+    raise SystemExit("Native icon missing; run python scripts/make_icons.py first")
 separator = ";" if sys.platform == "win32" else ":"
 library = Path(gmsh.libpath)
 if not library.is_file():
     raise SystemExit(f"Gmsh shared library not found: {library}")
 args = [sys.executable,"-m","PyInstaller","--noconfirm","--clean","--name","Ceda",
-        "--windowed","--paths",str(root/"src"),
+        "--windowed","--icon",str(icon_path),"--paths",str(root/"src"),
         "--add-data",f"{root/'src'/'ceda'/'resources'}{separator}ceda/resources",
         "--add-binary",f"{library}{separator}.",
         "--specpath",str(root/"build"),

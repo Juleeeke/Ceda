@@ -18,21 +18,8 @@ from ceda.kicad import load_board
 from ceda.resources import demo_board,demo_config
 from .boardview import BoardView
 
-STYLE = """
-QMainWindow,QWidget { background:#101923; color:#dce6ee; font-family:'.AppleSystemUIFont','Segoe UI',sans-serif; font-size:13px; }
-QGroupBox { border:1px solid #2b3e50; border-radius:9px; margin-top:16px; padding:13px 9px 8px; font-weight:600; }
-QGroupBox::title { subcontrol-origin:margin; left:11px; color:#b0c8d8; }
-QPushButton { background:#243b4d; border:1px solid #385468; border-radius:7px; padding:8px 13px; }
-QPushButton:hover { background:#355366; } QPushButton:disabled { color:#617483; background:#1b2a37; }
-QPushButton#run { background:#218e80; border:0; color:white; font-weight:700; padding:11px; }
-QComboBox,QDoubleSpinBox,QTextEdit,QTableWidget { background:#172532; border:1px solid #324959; border-radius:5px; padding:5px; }
-QHeaderView::section { background:#223747; border:0; padding:8px; color:#a7c0d1; }
-QTableWidget { gridline-color:#293d4d; }
-QLabel#title { font-size:24px; font-weight:700; color:#e8f5fa; }
-QLabel#subtitle { color:#96b0c3; }
-QLabel#metric { font-size:19px; font-weight:650; color:#91e0d0; }
-QSplitter::handle { background:#243747; }
-"""
+from .theme import STYLE
+from .layout import build_workbench
 
 
 def numeric(value,minimum=0.000001,maximum=100000,decimals=5):
@@ -55,88 +42,7 @@ class Workbench(QMainWindow):
         self.run_path = Path(self.workspace.name)/"run"
         self.process = None
         self.buffer = ""
-        central = QWidget()
-        root = QVBoxLayout(central)
-        root.setContentsMargins(22,18,22,16)
-        top = QHBoxLayout()
-        titles = QVBoxLayout()
-        title = QLabel("Ceda  /  PCB 后布局工作台")
-        title.setObjectName("title")
-        self.subtitle = QLabel("本地计算 · 真实铜几何 · 电源与回流联合分析")
-        self.subtitle.setObjectName("subtitle")
-        titles.addWidget(title); titles.addWidget(self.subtitle)
-        top.addLayout(titles); top.addStretch()
-        for text,callback in (("导入 PCB",self.open_board),("演示板",self.open_demo),("打开工况",self.open_config),("保存工况",self.save_config),("导出结果",self.export_results)):
-            button = QPushButton(text); button.clicked.connect(callback); top.addWidget(button)
-        root.addLayout(top)
-        split = QSplitter()
-        root.addWidget(split,1)
-        side = QWidget(); side_layout = QVBoxLayout(side)
-        source_box = QGroupBox("01  电源端口")
-        form = QFormLayout(source_box)
-        self.source_p,self.source_n = QComboBox(),QComboBox()
-        self.voltage = numeric(3.3)
-        form.addRow("正极焊盘",self.source_p); form.addRow("回流焊盘",self.source_n); form.addRow("电压 / V",self.voltage)
-        side_layout.addWidget(source_box)
-        load_box = QGroupBox("02  负载端口")
-        form = QFormLayout(load_box)
-        self.load_p,self.load_n = QComboBox(),QComboBox()
-        self.current = numeric(0.1)
-        self.minimum = numeric(3.0,minimum=0)
-        form.addRow("VDD 焊盘",self.load_p); form.addRow("本地 GND",self.load_n)
-        form.addRow("电流 / A",self.current); form.addRow("最低电压 / V",self.minimum)
-        add = QPushButton("添加到负载列表"); add.clicked.connect(self.add_load); form.addRow(add)
-        side_layout.addWidget(load_box)
-        self.loads = QTableWidget(0,4)
-        self.loads.setHorizontalHeaderLabels(["VDD","GND","A","最低 V"])
-        self.loads.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.loads.verticalHeader().setVisible(False)
-        self.loads.setMaximumHeight(150)
-        side_layout.addWidget(self.loads)
-        remove = QPushButton("删除选中负载"); remove.clicked.connect(lambda:self.loads.removeRow(self.loads.currentRow()))
-        side_layout.addWidget(remove)
-        solver_box = QGroupBox("03  几何与计算")
-        form = QFormLayout(solver_box)
-        self.mesh_size = numeric(0.5,minimum=0.02,maximum=5,decimals=3)
-        self.copper = numeric(0,minimum=0,maximum=1,decimals=4)
-        self.plating = numeric(0,minimum=0,maximum=0.2,decimals=4)
-        self.ambient = numeric(25,minimum=-50,maximum=150,decimals=1)
-        self.refine = QCheckBox("复核细化网格（推荐）"); self.refine.setChecked(True)
-        form.addRow("网格尺度 / mm",self.mesh_size); form.addRow("铜厚 / mm¹",self.copper)
-        form.addRow("孔镀层 / mm²",self.plating); form.addRow("环境 / °C",self.ambient); form.addRow(self.refine)
-        note = QLabel("¹ 0 使用文件叠层；² 有镀铜孔时必填。\n热场等扩展参数可在工况 JSON 中配置。")
-        note.setWordWrap(True); form.addRow(note)
-        side_layout.addWidget(solver_box)
-        self.run_button = QPushButton("开始供电分析"); self.run_button.setObjectName("run"); self.run_button.clicked.connect(self.run)
-        self.cancel_button = QPushButton("取消计算"); self.cancel_button.setEnabled(False); self.cancel_button.clicked.connect(self.cancel)
-        side_layout.addWidget(self.run_button); side_layout.addWidget(self.cancel_button); side_layout.addStretch()
-        split.addWidget(side)
-        middle = QWidget(); middle_layout = QVBoxLayout(middle)
-        viewbar = QHBoxLayout()
-        self.layer = QComboBox(); self.layer.currentTextChanged.connect(self.update_view)
-        self.field = QComboBox(); self.field.addItems(["电流密度","节点电压","板温（实验性）"]); self.field.currentIndexChanged.connect(self.update_view)
-        fit = QPushButton("适应视图"); fit.clicked.connect(lambda:self.view.render_board(fit=True))
-        viewbar.addWidget(self.layer); viewbar.addWidget(self.field); viewbar.addStretch(); viewbar.addWidget(fit)
-        middle_layout.addLayout(viewbar)
-        self.view = BoardView(); self.view.pad_clicked.connect(self.select_pad)
-        middle_layout.addWidget(self.view,1)
-        self.legend = QLabel("几何预览 · 尚未求解"); middle_layout.addWidget(self.legend)
-        self.result_table = QTableWidget(0,4); self.result_table.setHorizontalHeaderLabels(["负载","本地 VDD–GND","最低电压","判定"])
-        self.result_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.result_table.setMaximumHeight(135)
-        middle_layout.addWidget(self.result_table)
-        split.addWidget(middle)
-        right = QWidget(); right_layout = QVBoxLayout(right)
-        self.metric_label = QLabel("等待导入"); self.metric_label.setObjectName("metric"); right_layout.addWidget(self.metric_label)
-        self.status = QLabel("加载保存后的 PCB 铜几何。"); self.status.setWordWrap(True); right_layout.addWidget(self.status)
-        self.inspector = QTextEdit(); self.inspector.setReadOnly(True); right_layout.addWidget(self.inspector,1)
-        self.log = QTextEdit(); self.log.setReadOnly(True); self.log.setMaximumHeight(220); right_layout.addWidget(self.log)
-        report_button = QPushButton("打开完整报告"); report_button.clicked.connect(self.open_report); right_layout.addWidget(report_button)
-        right_layout.addWidget(QLabel("范围：规定工况 DC 供电\n实测校准：尚未完成\n芯片功能 / 固件：未验证"))
-        split.addWidget(right)
-        split.setSizes([310,800,310])
-        self.setCentralWidget(central)
-        self.view.render_board()
+        build_workbench(self)
 
     def error(self,message):
         self.status.setText(message)
@@ -169,6 +75,9 @@ class Workbench(QMainWindow):
         self.inspector.setPlainText(f"板卡概览\n\n文件：{self.board.path.name}\n器件：{len(self.board.components)}\n焊盘：{len(self.board.pads)}\n过孔：{len(self.board.vias)}\n\n叠层材料\n{materials}\n\n导入检查\n{issues}\n\n点击板上焊盘可查看网络与位置。")
         self.status.setText("预检有阻断问题，请查看右侧。" if any(i.severity == "error" for i in self.board.issues) else "几何导入完成；请确认电源、负载和材料。")
         self.metric_label.setText("几何已导入")
+        self.metric_label.setProperty("verdict","")
+        self.breadcrumb.setText(f"项目  ／  {self.board.path.stem}  ›  供电分析")
+        self.project_button.setText(self.board.path.stem)
         self.view.render_board(self.board,fit=True); self.legend.setText(self.view.range_text)
 
     def open_demo(self):
@@ -303,12 +212,16 @@ class Workbench(QMainWindow):
         except (OSError,ValueError) as exc:
             self.error(str(exc)); return
         self.metric_label.setText({"fail":"供电低于设定值","pass_scoped":"当前 DC 工况通过","unverified":"数值结果待核"}[self.report["verdict"]])
+        self.metric_label.setProperty("verdict",self.report["verdict"])
+        self.metric_label.style().unpolish(self.metric_label)
+        self.metric_label.style().polish(self.metric_label)
         diag = self.report["diagnostics"]
-        self.status.setText(f"{diag['nodes']:,} 节点 · {diag['copper_loss_w']*1000:.3f} mW 铜损\n网格复核：{self.report['mesh_refinement']['status']}\n未包含芯片功能与实测校准。")
+        self.status.setText(f"计算完成 · {diag['nodes']:,} 节点 · {diag['copper_loss_w']*1000:.3f} mW 铜损 · 网格复核：{self.report['mesh_refinement']['status']}")
         self.result_table.setRowCount(len(self.report["loads"]))
         for row,load in enumerate(self.report["loads"]):
             for col,value in enumerate((load["positive"],f"{load['voltage_v']:.6f} V",load["minimum_voltage_v"],load["verdict"])):
-                self.result_table.setItem(row,col,QTableWidgetItem(str(value)))
+                display={"fail":"低于设定值","pass":"当前工况通过","unverified":"待验证"}.get(str(value),str(value)) if col==3 else str(value)
+                self.result_table.setItem(row,col,QTableWidgetItem(display))
         quality = self.report["mesh_refinement"]
         unverified = "\n".join(f"• {item}" for item in self.report["unverified"])
         self.inspector.setPlainText(f"数值质量\n\n网格节点：{diag['nodes']:,}\n三角形：{diag['triangles']:,}\n电流残差：{diag['max_residual_a']:.3g} A\n功率不平衡：{diag['power_balance_relative']:.3%}\n网格细化：{quality['status']}\n\n{unverified}\n\n完整模型假设与复现记录见报告。")
@@ -321,7 +234,7 @@ class Workbench(QMainWindow):
     def update_view(self,*args):
         if hasattr(self,"view"):
             self.view.layer = self.layer.currentText()
-            self.view.field = ["current","voltage","temperature"][self.field.currentIndex()]
+            self.view.field = ["current","voltage","geometry","temperature"][self.field.currentIndex()]
             if self.view.field == "temperature" and self.report and not self.report.get("thermal"):
                 self.status.setText("此工况未运行热分析。请在工况 JSON 中明确热边界后启用。")
                 self.view.field = "current"

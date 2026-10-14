@@ -11,7 +11,7 @@ from shapely.geometry import Polygon
 
 def color(value, minimum, maximum):
     ratio = min(1,max(0,(value-minimum)/max(maximum-minimum,1e-12)))
-    stops = [(22,58,94),(28,139,150),(79,192,157),(241,195,88),(237,102,80)]
+    stops = [(232,237,243),(161,183,212),(90,136,185),(239,182,132),(212,107,85)]
     scaled = ratio*(len(stops)-1)
     i = min(int(scaled),len(stops)-2)
     f = scaled-i
@@ -27,7 +27,7 @@ def board_svg(board,report=None,layer=None,field="current_density",width=1000):
     margin = max(x1-x0,y1-y0)*0.05
     height = round(width*(y1-y0+2*margin)/(x1-x0+2*margin))
     body = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="{x0-margin} {y0-margin} {x1-x0+2*margin} {y1-y0+2*margin}">',
-            f'<rect x="{x0-margin}" y="{y0-margin}" width="{x1-x0+2*margin}" height="{y1-y0+2*margin}" fill="#111e2d"/>']
+            f'<rect x="{x0-margin}" y="{y0-margin}" width="{x1-x0+2*margin}" height="{y1-y0+2*margin}" fill="#ffffff"/>']
     def path(shape,fill,stroke="none"):
         polygons = [shape] if isinstance(shape,Polygon) else list(shape.geoms)
         for polygon in polygons:
@@ -36,10 +36,10 @@ def board_svg(board,report=None,layer=None,field="current_density",width=1000):
                 commands.append("M "+" L ".join(f"{x:.6g},{y:.6g}" for x,y in ring.coords)+" Z")
             body.append(f'<path d="{" ".join(commands)}" fill="{fill}" fill-rule="evenodd" stroke="{stroke}" stroke-width="0.08"/>')
     if board.outline is not None:
-        path(board.outline,"#182b3a","#526e7c")
+        path(board.outline,"#fafbfc","#bbc3cf")
     for (net,name),geometry in board.copper.items():
         if layer is None or name == layer:
-            path(geometry,"#365469")
+            path(geometry,"#b6c7d4")
     if report:
         mesh = report["mesh"]
         values = mesh["current_density_a_mm2"] if field == "current_density" else np.mean(np.array(mesh["voltage_v"])[mesh["triangles"]],axis=1)
@@ -51,8 +51,8 @@ def board_svg(board,report=None,layer=None,field="current_density",width=1000):
                 body.append('<polygon points="'+' '.join(f'{x:.6g},{y:.6g}' for x,y in coords)+f'" fill="{color(values[i],minimum,maximum)}"/>')
     for pad in board.pads:
         if layer is None or layer in pad.layers:
-            path(pad.geometry,"none","#f6e0a5")
-            body.append(f'<text x="{pad.x+0.2}" y="{pad.y-0.3}" font-family="sans-serif" font-size="0.65" fill="#f3f6f9">{html.escape(pad.id)}</text>')
+            path(pad.geometry,"none","#778394")
+            body.append(f'<text x="{pad.x+0.2}" y="{pad.y-0.3}" font-family="sans-serif" font-size="0.65" fill="#535f70">{html.escape(pad.id)}</text>')
     body.append("</svg>")
     return "\n".join(body)
 
@@ -89,7 +89,7 @@ def write_report(board,report,output):
     thermal = report.get("thermal")
     heat = f"<p>实验性板温估算最高 {thermal['maximum_board_c']:.2f} °C；{escaped(thermal['coupling_status'])}。不包含结温验证。</p>" if thermal else "<p>热分析未运行。</p>"
     markup = f"""<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>Ceda PCB 分析报告</title>
-<style>body{{background:#101925;color:#e4edf4;font:16px system-ui,sans-serif;max-width:1100px;margin:40px auto;padding:20px}}h1,h2{{color:#90ddd0}}table{{border-collapse:collapse;width:100%}}td,th{{padding:12px;text-align:left;border-bottom:1px solid #344454}}svg{{max-width:100%;height:auto}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;color:#a9becd}}.badge{{padding:8px 14px;background:#294151;border-radius:8px}}</style>
+<style>body{{background:#fff;color:#303844;font:14px system-ui,sans-serif;max-width:1100px;margin:40px auto;padding:20px}}h1,h2{{color:#252d37;font-weight:600}}h1{{font-size:26px}}h2{{font-size:18px;margin-top:32px}}h3{{font-size:14px;color:#6f7c8d;font-weight:500}}table{{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}}td,th{{padding:12px;text-align:left;border-bottom:1px solid #e9edf2}}th{{color:#8a95a4;font-weight:400}}svg{{max-width:100%;height:auto}}pre{{white-space:pre-wrap;overflow-wrap:anywhere;color:#7d8896;font-size:12px;background:#fafbfc;padding:16px;border:1px solid #edf0f4;border-radius:5px}}.badge{{padding:9px 12px;background:#f8f9fb;border:1px solid #e9edf2;border-radius:5px;color:#677486}}p,li{{line-height:1.8}}</style>
 <h1>Ceda · PCB 后布局分析</h1><p>{escaped(report['config']['name'])}</p><p class="badge">{escaped(report['verdict'])} · 仅对已配置 DC 工况判定 · 无实测校准</p>
 <h2>负载端供电</h2><table><tr><th>负载</th><th>端口</th><th>本地 VDD–GND</th><th>最低电压/V</th><th>判定</th></tr>{rows}</table>
 <h2>数值质量</h2><pre>{escaped(json.dumps(report['diagnostics'],ensure_ascii=False,indent=2))}</pre><h3>网格细化</h3><pre>{escaped(json.dumps(report['mesh_refinement'],ensure_ascii=False,indent=2))}</pre>

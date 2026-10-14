@@ -17,6 +17,12 @@ The native macOS window was also opened successfully. Terminal, offscreen Qt and
 
 ![Ceda desktop workbench](images/workbench.png)
 
+## White workbench visual update
+
+The user selected preview A. The native Qt layout and reports now use white backgrounds, light dividers and project navigation, a focused copper canvas, a right inspector and a bottom result table. The original imagegen artwork is used by the window, navigation brand and macOS/Windows application icon formats. Three standalone HTML previews remain under `design/previews`.
+
+All 29 existing tests passed after the layout change. A screenshot review caught and corrected a Qt stylesheet/NoButtons issue that reduced numerical editor width to one pixel; values are now visibly readable. The solver input and numerical result for the synthetic demo are unchanged.
+
 ## Outstanding evidence
 
 - Windows/Linux CI jobs are configured but have not run in this local session.

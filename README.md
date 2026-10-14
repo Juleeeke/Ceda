@@ -35,6 +35,7 @@ ceda transient outputs/demo/result.json --output outputs/transient
 
 ```sh
 python -m pytest
+python scripts/make_icons.py
 python scripts/build_desktop.py
 ```
 
@@ -52,5 +53,7 @@ python scripts/build_desktop.py
 - [原始需求](docs/01_需求与完整链路设计.md)
 - [生态调研](docs/02_开源与商业工具调研.md)
 - [第三方许可](THIRD_PARTY_NOTICES.md)
+- [选定的白色界面与图标](design/ICON_PROMPT.md)
+- [三套 HTML 风格预览](design/previews/index.html)
 
 Ceda 自有代码遵循仓库 MIT 许可证；Gmsh、Qt、数值库和外部模型分别遵循其许可证，桌面分发包不能只按 MIT 描述全部依赖。
