@@ -35,8 +35,11 @@ def arc_points(start, mid, end, tolerance=0.01):
         sweep -= 2 * math.pi
     step = min(math.pi / 24, 2 * math.acos(max(-1, 1 - tolerance / radius)))
     count = max(3, math.ceil(abs(sweep) / max(step, 1e-5)) + 1)
-    return [(center + radius * np.array([math.cos(t), math.sin(t)])).tolist()
-            for t in np.linspace(angles[0], angles[0] + sweep, count)]
+    points = [(center + radius * np.array([math.cos(t), math.sin(t)])).tolist()
+              for t in np.linspace(angles[0], angles[0] + sweep, count)]
+    # Retain exact serialized endpoints so adjoining Edge.Cuts form a closed ring.
+    points[0], points[-1] = list(start), list(end)
+    return points
 
 
 def polygon_points(node):
@@ -71,6 +74,15 @@ def pad_shape(node):
     if w <= 0 or h <= 0:
         raise CedaError("焊盘尺寸必须大于 0。")
     kind = node[3]
+    if kind == "custom":
+        from .presentation import graphic_shape
+        primitives = child(node, "primitives")
+        if not primitives:
+            raise CedaError("尚不支持缺少 primitives 的 custom 焊盘。")
+        anchor = child(child(node, "options", ["options"]), "anchor", ["anchor", "circle"])[1]
+        shapes = [box(-w/2,-h/2,w/2,h/2) if anchor == "rect" else Point(0,0).buffer(w/2,quad_segs=32)]
+        shapes.extend(graphic_shape(p) for p in primitives[1:] if isinstance(p,list))
+        return unary_union(shapes)
     if kind == "circle":
         return Point(0, 0).buffer(w / 2, quad_segs=32)
     if kind in {"rect", "roundrect"}:
@@ -147,9 +159,13 @@ def load_board(path: str | Path) -> Board:
                 px = origin[0]+local[0]*math.cos(theta)-local[1]*math.sin(theta)
                 py = origin[1]+local[0]*math.sin(theta)+local[1]*math.cos(theta)
                 drill = child(node,"drill")
-                if drill is None or drill[1] == "oval" or child(drill,"offset") is not None:
-                    raise CedaError("非镀铜孔必须有受支持的圆形、非偏心孔定义。")
-                drill_cuts.append((Point(px,py).buffer(float(drill[1])/2,quad_segs=32),layer_names))
+                from .presentation import drill_shape
+                pad_at = child(node,"at")
+                angle = float(pad_at[3]) if len(pad_at)>3 else 0
+                hole = drill_shape(node,px,py,angle)
+                if hole is None:
+                    raise CedaError("非镀铜孔必须有钻孔定义。")
+                drill_cuts.append((hole,layer_names))
                 continue
             local = xy(node, "at")
             pad_at = child(node, "at")
@@ -157,7 +173,8 @@ def load_board(path: str | Path) -> Board:
             theta = math.radians(-rotation)
             px = origin[0] + local[0]*math.cos(theta) - local[1]*math.sin(theta)
             py = origin[1] + local[0]*math.sin(theta) + local[1]*math.cos(theta)
-            shape = transform(pad_shape(node), px, py, rotation + angle)
+            # KiCad serializes pad angle in the board frame, not the footprint frame.
+            shape = transform(pad_shape(node), px, py, angle)
             layers_token = child(node, "layers", ["layers"])[1:]
             pad_layers = list(layer_names) if "*.Cu" in layers_token else [n for n in layer_names if n in layers_token]
             if not pad_layers:
@@ -175,6 +192,7 @@ def load_board(path: str | Path) -> Board:
             pads.append(pad)
             for layer in pad_layers:
                 pieces[(pad.net, layer)].append(shape)
+    tracks = []
     for node in children(root, "segment") + children(root, "arc"):
         layer = child(node, "layer")[1]
         if layer not in layer_names:
@@ -184,7 +202,9 @@ def load_board(path: str | Path) -> Board:
         width = number(node, "width")
         if width is None or width <= 0:
             raise CedaError("铜走线宽度无效。")
-        pieces[(net_name(node), layer)].append(LineString(coords).buffer(width/2, quad_segs=16))
+        geometry = LineString(coords).buffer(width/2, quad_segs=16)
+        pieces[(net_name(node), layer)].append(geometry)
+        tracks.append({"net":net_name(node),"layer":layer,"geometry":geometry,"width_mm":width})
     for index, node in enumerate(children(root, "via")):
         x, y = xy(node, "at")
         diameter, drill = number(node, "size"), number(node, "drill")
@@ -262,4 +282,8 @@ def load_board(path: str | Path) -> Board:
             for net_b, b in layer_shapes[i+1:]:
                 if a.intersects(b):
                     issues.append(Issue("physical_short", "error", f"{layer} 上 {net_a or '未分配'} 与 {net_b or '未分配'} 的铜接触。", [net_a, net_b, layer]))
-    return Board(path, hashlib.sha256(raw).hexdigest(), int(number(root,"version",0)), layers, pads, vias, copper, outline, issues, components, number(child(root,"general",["general"]),"thickness"))
+    board = Board(path, hashlib.sha256(raw).hexdigest(), int(number(root,"version",0)), layers, pads, vias, copper, outline, issues, components, number(child(root,"general",["general"]),"thickness"))
+    board.tracks = tracks
+    from .presentation import collect_presentation
+    collect_presentation(board,root)
+    return board

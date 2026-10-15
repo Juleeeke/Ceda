@@ -60,6 +60,13 @@ class Board:
     issues: list[Issue]
     components: dict[str, dict[str, Any]]
     board_thickness_mm: float | None
+    # Presentation objects retain source geometry; solver copper stays independent.
+    graphics: list[dict[str, Any]] = field(default_factory=list)
+    tracks: list[dict[str, Any]] = field(default_factory=list)
+    holes: list[dict[str, Any]] = field(default_factory=list)
+    mask_openings: dict[str, BaseGeometry] = field(default_factory=dict)
+    presentation_warnings: list[str] = field(default_factory=list)
+    stackup: list[dict[str, Any]] = field(default_factory=list)
 
     def pad(self, identifier: str) -> Pad:
         matches = [p for p in self.pads if p.id == identifier]

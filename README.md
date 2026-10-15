@@ -57,3 +57,7 @@ python scripts/build_desktop.py
 - [三套 HTML 风格预览](design/previews/index.html)
 
 Ceda 自有代码遵循仓库 MIT 许可证；Gmsh、Qt、数值库和外部模型分别遵循其许可证，桌面分发包不能只按 MIT 描述全部依赖。
+
+### PCB 工程视口
+
+可切换二维板卡与三维实体；查看图层、丝印、钻孔、真实 STEP/VRML 元件模型及模型缺失诊断。提供深/浅画布、毫米比例尺、正反面检查和旋转缩放。使用方法、KiCad 源码参考及准确性边界见 [真实 PCB 呈现](docs/03_真实PCB呈现与KiCad参考.md)。三维视口用于几何检查，不代表已经完成整板功能或三维场求解。

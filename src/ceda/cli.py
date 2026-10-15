@@ -19,6 +19,10 @@ def main(argv=None):
     gui = sub.add_parser("gui",help="Open desktop workbench")
     gui.add_argument("--demo",action="store_true")
     gui.add_argument("--screenshot")
+    gui.add_argument('--board');gui.add_argument('--view',choices=['2d','3d'],default='2d')
+    gui.add_argument('--model-library')
+    model_mesh = sub.add_parser('model-mesh',help='Internal isolated STEP display tessellation')
+    model_mesh.add_argument('source');model_mesh.add_argument('output')
     inspect = sub.add_parser("inspect",help="Inspect actual KiCad PCB geometry")
     inspect.add_argument("board")
     inspect.add_argument("--netlist")
@@ -40,7 +44,14 @@ def main(argv=None):
     try:
         if args.command in (None,"gui"):
             from .gui.app import launch
-            return launch(getattr(args,"demo",False),getattr(args,"screenshot",None))
+            return launch(getattr(args,"demo",False),getattr(args,"screenshot",None),
+                getattr(args,'board',None),getattr(args,'view','2d'),getattr(args,'model_library',None))
+        if args.command == 'model-mesh':
+            import numpy as np
+            from .visualization.models import step_mesh
+            triangles,colors=step_mesh(args.source)
+            np.savez_compressed(args.output,triangles=triangles,colors=colors)
+            return 0
         from .kicad import load_board
         if args.command == "inspect":
             board = load_board(args.board)

@@ -3,10 +3,12 @@ from PySide6.QtCore import QSize,Qt
 from PySide6.QtGui import QIcon,QPixmap
 from PySide6.QtWidgets import (QApplication,QButtonGroup,QCheckBox,QComboBox,QDoubleSpinBox,
     QFormLayout,QFrame,QGroupBox,QHBoxLayout,QHeaderView,QLabel,QPushButton,QScrollArea,
-    QTabBar,QTableWidget,QTextEdit,QVBoxLayout,QWidget)
+    QTabBar,QTableWidget,QTextEdit,QVBoxLayout,QWidget,QStackedWidget,QMenu)
+from PySide6.QtGui import QAction
 
 from ceda.resources import app_icon
 from .boardview import BoardView
+from .board3d import Board3D
 from .theme import STYLE,glyph
 
 
@@ -49,16 +51,18 @@ def build_workbench(w):
     sidebar_layout.addWidget(label("工作空间","sectionLabel"));sidebar_layout.addSpacing(5)
     w.navigation=QButtonGroup(w);w.navigation.setExclusive(True)
     def overview():
+        w.dimension.setCurrentIndex(0)
         w.field.setCurrentIndex(2)
         if w.board:
             w.inspector.setPlainText(f"{w.board.path.name}\n\n{len(w.board.layers)} 个铜层\n{len(w.board.pads)} 个焊盘\n{len(w.board.vias)} 个过孔\n\n"+"\n".join(i.message for i in w.board.issues))
     def analysis():
+        w.dimension.setCurrentIndex(0)
         w.field.setCurrentIndex(0)
     def materials():
         w.advanced.setChecked(True)
         w.mesh_size.setFocus()
     for title,symbol,callback,enabled in [("板卡概览","board",overview,True),("供电分析","wave",analysis,True),
-        ("叠层与材料","layers",materials,True),("器件模型","models",lambda:None,False),("分析报告","report",w.open_report,True)]:
+        ("叠层与材料","layers",materials,True),("器件模型","models",lambda:w.dimension.setCurrentIndex(1),True),("分析报告","report",w.open_report,True)]:
         item=button(title,callback,"nav",symbol);item.setCheckable(True);item.setEnabled(enabled)
         if not enabled:item.setToolTip("器件模型库将在后续版本接入。")
         if title=="供电分析":item.setChecked(True)
@@ -86,14 +90,40 @@ def build_workbench(w):
     for name in ("电流密度","电压分布","铜层几何","板温（实验性）"):w.field.addTab(name)
     w.field.currentChanged.connect(w.update_view)
     viewbar.addWidget(w.field);viewbar.addStretch()
-    w.layer=QComboBox();w.layer.setFixedWidth(74);w.layer.setAccessibleName("铜层");w.layer.currentTextChanged.connect(w.update_view)
+    w.dimension=QComboBox();w.dimension.addItems(["二维板卡","三维实体"]);w.dimension.setFixedWidth(100)
+    w.dimension.currentIndexChanged.connect(w.update_dimension);viewbar.addWidget(w.dimension)
+    w.layer=QComboBox();w.layer.setFixedWidth(88);w.layer.setAccessibleName("铜层");w.layer.currentTextChanged.connect(w.update_view)
     viewbar.addWidget(w.layer)
-    fit=button("",lambda:w.view.render_board(fit=True),"quiet","fit");fit.setFixedWidth(28);fit.setToolTip("适应画布");fit.setAccessibleName("适应画布");viewbar.addWidget(fit)
+    fit=button("",w.fit_view,"quiet","fit");fit.setFixedWidth(28);fit.setToolTip("适应画布");fit.setAccessibleName("适应画布");viewbar.addWidget(fit)
     canvas_layout.addLayout(viewbar);canvas_layout.addWidget(divider());canvas_layout.addSpacing(18)
     canvas_frame=QFrame();canvas_frame.setObjectName("canvas");inside=QVBoxLayout(canvas_frame);inside.setContentsMargins(12,9,12,9);inside.setSpacing(4)
-    inside.addWidget(label("PCB 铜层  /  供电与回流网络"));w.view=BoardView();w.view.pad_clicked.connect(w.select_pad)
-    inside.addWidget(w.view,1);canvas_layout.addWidget(canvas_frame,1);canvas_layout.addSpacing(11)
-    legend_row=QHBoxLayout();w.legend=label("几何预览 · 尚未求解","legend");legend_row.addWidget(w.legend);legend_row.addStretch();legend_row.addWidget(label("点击焊盘定位 · 滚轮缩放"));canvas_layout.addLayout(legend_row)
+    viewport_tools=QHBoxLayout();viewport_tools.setSpacing(7)
+    layers_button=QPushButton("图层与显示");menu=QMenu(layers_button);layers_button.setMenu(menu)
+    for name in ('F.Cu','B.Cu','F.SilkS','B.SilkS','F.Fab','B.Fab','F.CrtYd','B.CrtYd','Edge.Cuts'):
+        action=QAction(name,menu);action.setCheckable(True);action.setChecked(name in {'F.Cu','B.Cu','F.SilkS','B.SilkS','Edge.Cuts'})
+        action.toggled.connect(lambda checked,layer=name:w.toggle_layer(layer,checked));menu.addAction(action)
+    menu.addSeparator()
+    for title,key,checked in [('网格','show_grid',True),('位号与引脚','show_labels',True),('求解网格','show_mesh',False)]:
+        action=QAction(title,menu);action.setCheckable(True);action.setChecked(checked)
+        action.toggled.connect(lambda enabled,attribute=key:w.toggle_display(attribute,enabled));menu.addAction(action)
+    menu.addSeparator()
+    for title,category in [('三维阻焊','mask'),('三维丝印','silk'),('三维器件','models')]:
+        action=QAction(title,menu);action.setCheckable(True);action.setChecked(True)
+        action.toggled.connect(lambda enabled,key=category:w.toggle_3d(key,enabled));menu.addAction(action)
+    viewport_tools.addWidget(layers_button)
+    light=QCheckBox("浅色画布");light.toggled.connect(lambda enabled:w.view.set_light(enabled));viewport_tools.addWidget(light)
+    viewport_tools.addStretch()
+    for text,pose in [('俯视','top'),('背面','bottom'),('等轴','iso')]:
+        viewport_tools.addWidget(button(text,lambda checked=False,p=pose:w.set_pose(p),'quiet'))
+    viewport_tools.addWidget(button("模型目录",w.choose_models,'quiet'))
+    viewport_tools.addWidget(button("模型诊断",w.show_model_details,'quiet'))
+    inside.addLayout(viewport_tools)
+    w.views=QStackedWidget();w.view=BoardView();w.view.pad_clicked.connect(w.select_pad)
+    w.view3d=Board3D();w.view3d.pad_clicked.connect(w.select_pad);w.view3d.model_status.connect(w.model_status)
+    w.views.addWidget(w.view);w.views.addWidget(w.view3d);inside.addWidget(w.views,1)
+    canvas_layout.addWidget(canvas_frame,1);canvas_layout.addSpacing(11)
+    legend_row=QHBoxLayout();w.legend=label("文件几何 · 单位 mm","legend");legend_row.addWidget(w.legend);legend_row.addStretch()
+    w.cursor=label("点击焊盘 · 滚轮缩放");w.view.cursor_changed.connect(w.cursor.setText);legend_row.addWidget(w.cursor);canvas_layout.addLayout(legend_row)
     canvas_layout.addSpacing(20);canvas_layout.addWidget(divider());canvas_layout.addSpacing(16)
     result_header=QHBoxLayout();result_header.addWidget(label("负载端供电","inspectorTitle"));result_header.addStretch()
     result_header.addWidget(button("查看完整报告 ↗",w.open_report,"quiet"));canvas_layout.addLayout(result_header)
@@ -145,3 +175,4 @@ def build_workbench(w):
     w.status=QLabel("本地工作空间 · 等待导入 PCB");w.status.setObjectName("muted");w.statusBar().addWidget(w.status,1)
     w.statusBar().addPermanentWidget(label("F.Cu  ·  Ceda 0.1"));w.statusBar().setSizeGripEnabled(False)
     w.view.render_board()
+    w.field.setCurrentIndex(2)

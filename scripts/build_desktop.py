@@ -26,6 +26,7 @@ args = [sys.executable,"-m","PyInstaller","--noconfirm","--clean","--name","Ceda
         "--specpath",str(root/"build"),
         "--copy-metadata","ceda","--copy-metadata","numpy","--copy-metadata","scipy",
         "--copy-metadata","shapely","--copy-metadata","gmsh",
+        "--hidden-import","PySide6.QtQuick3D","--hidden-import","PySide6.QtQuickWidgets",
         "--exclude-module","PySide6.QtWebEngineCore","--exclude-module","PySide6.QtWebEngineWidgets",
         "--exclude-module","PySide6.QtPdf","--exclude-module","PySide6.QtPdfWidgets",
         "--exclude-module","tkinter","--exclude-module","matplotlib",

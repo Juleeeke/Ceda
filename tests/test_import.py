@@ -38,7 +38,15 @@ def test_rotated_footprint_y_down_transform(tmp_path):
     board = load_board(write_board(tmp_path,text))
     assert board.pad("J1.2").x == pytest.approx(24)
     assert board.pad("J1.2").y == pytest.approx(14)
-    assert board.pad("J1.2").geometry.bounds[2]-board.pad("J1.2").geometry.bounds[0] == pytest.approx(4)
+    # Serialized pad angle is absolute: omission means 0 even in a 90 degree footprint.
+    assert board.pad("J1.2").geometry.bounds[2]-board.pad("J1.2").geometry.bounds[0] == pytest.approx(2)
+
+
+def test_pad_angle_is_absolute_board_frame(tmp_path):
+    text = demo_board().read_text().replace('(at 6 6)','(at 16 14 90)',1).replace('(at 0 8)','(at 0 8 90)',1)
+    board = load_board(write_board(tmp_path,text))
+    bounds = board.pad('J1.2').geometry.bounds
+    assert bounds[2]-bounds[0] == pytest.approx(4)
 
 
 def test_short_reported(tmp_path):

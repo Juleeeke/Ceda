@@ -30,3 +30,9 @@ All 29 existing tests passed after the layout change. A screenshot review caught
 - No official full KiCad DRC/ERC pass is claimed. The current machine's KiCad application folder contains broken application links; native PCB parsing does not depend on that installation.
 - Thermal output is an experimental thickness-averaged model; passing energy balance does not validate junction temperatures or real convection accuracy.
 - The app is a local development build with ad-hoc signing, not a notarized public release or a license-complete redistribution package.
+
+## PCB viewport revision (2026-10-15)
+
+Geometry regression tests cover exact arc endpoints, KiCad absolute pad angles, transformed silkscreen, rotated nonplated slots, mask openings, triangulation with cutouts, VRML units/DEF/USE/transforms, back-side model placement, and input-order-independent depth-buffer occlusion. Real-board display was exercised against KiCad's unmodified StickHub example (94 footprints, 273 pads, 87 vias); visual geometry and numerical validation are separate evidence levels. See `03_真实PCB呈现与KiCad参考.md` for source links, local-only fixture licensing and remaining limits.
+
+Final automated result: **39 passed**, including a complete asynchronous 3D loader/rasterizer lifecycle. Packaged STEP conversion and a packaged real-board 3D software-render capture succeeded. The native macOS GPU viewport was started, but its final visual inspection was interrupted by the Mac locking; GPU visual acceptance is still pending and is not included in the automated pass count. Windows/Linux GUI and model-loader smoke checks have not been run here.

@@ -62,6 +62,7 @@ class Workbench(QMainWindow):
             self.board = load_board(path)
         except CedaError as exc:
             self.error(str(exc)); return
+        self.view3d.stop_workers();self.view3d.board=None;self.view3d.scene_data=None;self.view3d.image=None
         self.report = None; self.loaded_config = None; self.view.report = None; self.view.selected_pad = None
         self.loads.setRowCount(0); self.result_table.setRowCount(0)
         self.layer.clear(); self.layer.addItems([l.name for l in self.board.layers])
@@ -78,7 +79,9 @@ class Workbench(QMainWindow):
         self.metric_label.setProperty("verdict","")
         self.breadcrumb.setText(f"项目  ／  {self.board.path.stem}  ›  供电分析")
         self.project_button.setText(self.board.path.stem)
+        self.field.setCurrentIndex(2)
         self.view.render_board(self.board,fit=True); self.legend.setText(self.view.range_text)
+        if self.dimension.currentIndex()==1:self.view3d.set_board(self.board)
 
     def open_demo(self):
         self.load(str(demo_board()))
@@ -225,7 +228,9 @@ class Workbench(QMainWindow):
         quality = self.report["mesh_refinement"]
         unverified = "\n".join(f"• {item}" for item in self.report["unverified"])
         self.inspector.setPlainText(f"数值质量\n\n网格节点：{diag['nodes']:,}\n三角形：{diag['triangles']:,}\n电流残差：{diag['max_residual_a']:.3g} A\n功率不平衡：{diag['power_balance_relative']:.3%}\n网格细化：{quality['status']}\n\n{unverified}\n\n完整模型假设与复现记录见报告。")
-        self.view.render_board(report=self.report); self.legend.setText(self.view.range_text)
+        if self.dimension.currentIndex()==0:self.field.setCurrentIndex(0)
+        self.view.render_board(report=self.report)
+        if self.dimension.currentIndex()==0:self.legend.setText(self.view.range_text)
 
     def cancel(self):
         if self.process and self.process.state() != QProcess.ProcessState.NotRunning:
@@ -240,7 +245,63 @@ class Workbench(QMainWindow):
                 self.view.field = "current"
             self.view.render_board(); self.legend.setText(self.view.range_text)
 
+    def update_dimension(self,index):
+        if not hasattr(self,'views'):return
+        self.views.setCurrentIndex(index)
+        self.field.setEnabled(index==0);self.layer.setEnabled(index==0)
+        if index==1:
+            self.cursor.setText('拖动旋转 · Shift 拖动平移 · 滚轮缩放')
+            if self.board and self.view3d.board is not self.board:self.view3d.set_board(self.board)
+            self.legend.setText('三维实体检查 · 未叠加电磁场或温度结果')
+        else:
+            self.cursor.setText('点击焊盘 · 滚轮缩放');self.legend.setText(self.view.range_text)
+
+    def fit_view(self):
+        if self.dimension.currentIndex():self.view3d.fit()
+        else:self.view.render_board(fit=True)
+
+    def toggle_layer(self,layer,enabled):
+        if not hasattr(self,'view'):return
+        if enabled:self.view.visible_layers.add(layer)
+        else:self.view.visible_layers.discard(layer)
+        self.view.render_board()
+
+    def toggle_display(self,attribute,enabled):
+        if hasattr(self,'view'):setattr(self.view,attribute,enabled);self.view.render_board()
+
+    def toggle_3d(self,category,enabled):
+        if enabled:self.view3d.enabled_categories.add(category)
+        else:self.view3d.enabled_categories.discard(category)
+        self.view3d.schedule()
+
+    def set_pose(self,pose):
+        self.dimension.setCurrentIndex(1);self.view3d.pose(pose)
+
+    def choose_models(self):
+        path=QFileDialog.getExistingDirectory(self,'选择 KiCad 3D 模型库根目录（包含 .3dshapes 文件夹）')
+        if path:self.view3d.set_library(path)
+
+    def model_status(self,message):
+        blocked=self.board and any(i.severity=='error' for i in self.board.issues)
+        self.status.setText(message+(' · 导入预检仍有阻断项' if blocked else ''))
+        if self.view3d.scene_data:
+            details='\n'.join(self.view3d.scene_data.warnings)
+            self.inspector.setPlainText(f'{message}\n\n{details}\n\n缺失模型不会生成替代实体。阻焊颜色未指定时使用绿色显示预设；文字使用系统字体。')
+
+    def show_model_details(self):
+        scene=self.view3d.scene_data
+        message=QMessageBox(self);message.setWindowTitle('模型与呈现诊断')
+        message.setText(self.view3d.note if scene else '先切换三维实体，读取当前 PCB 的模型关联。')
+        if scene:
+            message.setDetailedText('\n'.join(scene.warnings) or '当前没有模型读取提示；这不代表已完成机械或实物验证。')
+            message.setInformativeText('模型缺失会保留为空。显示外观预设、字体及未实现的几何特征见呈现说明。')
+        message.exec()
+
     def select_pad(self,identifier):
+        matches=[p for p in self.board.pads if p.id==identifier]
+        if len(matches)!=1:
+            self.inspector.setPlainText(f'{identifier} 对应 {len(matches)} 个同号焊盘几何。\n\n可查看并高亮这些铜对象；当前求解端口要求唯一焊盘，不能自动选择其中一个。')
+            return
         pad = self.board.pad(identifier)
         self.inspector.setPlainText(f"焊盘：{pad.id}\n网络：{pad.net}\n层：{', '.join(pad.layers)}\n位置：{pad.x:.4f}, {pad.y:.4f} mm\n铜面积：{pad.geometry.area:.5f} mm²")
         self.combo_select(self.load_p,identifier)
@@ -265,18 +326,28 @@ class Workbench(QMainWindow):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.run_path/"report.html")))
 
     def closeEvent(self,event):
+        self.view3d.stop_workers()
         if self.process and self.process.state() != QProcess.ProcessState.NotRunning:
             self.process.kill(); self.process.waitForFinished(3000)
         self.workspace.cleanup()
         super().closeEvent(event)
 
 
-def launch(demo=False,screenshot=None):
+def launch(demo=False,screenshot=None,board_path=None,view='2d',model_library=None):
+    # Keep diagnostics available in a windowed packaged app (which has no terminal).
+    if getattr(sys,'frozen',False):
+        diagnostic=Path(tempfile.gettempdir())/'ceda-desktop.log'
+        stream=diagnostic.open('a',encoding='utf-8',buffering=1)
+        if sys.stderr is None:sys.stderr=stream
+        if sys.stdout is None:sys.stdout=stream
     app = QApplication.instance() or QApplication(["Ceda"])
     app.setApplicationName("Ceda"); app.setStyle("Fusion"); app.setStyleSheet(STYLE)
     window = Workbench(); window.show()
     if demo:
         window.open_demo()
+    elif board_path:window.load(board_path)
+    if model_library:window.view3d.library_root=Path(model_library).resolve()
+    if view=='3d':window.dimension.setCurrentIndex(1)
     if screenshot:
         if demo:
             QTimer.singleShot(100,window.run)
@@ -286,6 +357,12 @@ def launch(demo=False,screenshot=None):
             if demo and window.report is None and attempts[0] < 300:
                 QTimer.singleShot(100,capture)
                 return
+            if view=='3d' and attempts[0]<1800:
+                viewport=window.view3d
+                loading=viewport.loader and viewport.loader.isRunning()
+                drawing=viewport.raster and viewport.raster.isRunning()
+                if loading or drawing or viewport.pending or (not viewport.image and not viewport.gpu):
+                    QTimer.singleShot(100,capture);return
             try:
                 if not window.grab().save(screenshot):
                     raise CedaError("截图保存失败。")
