@@ -36,3 +36,13 @@ All 29 existing tests passed after the layout change. A screenshot review caught
 Geometry regression tests cover exact arc endpoints, KiCad absolute pad angles, transformed silkscreen, rotated nonplated slots, mask openings, triangulation with cutouts, VRML units/DEF/USE/transforms, back-side model placement, and input-order-independent depth-buffer occlusion. Real-board display was exercised against KiCad's unmodified StickHub example (94 footprints, 273 pads, 87 vias); visual geometry and numerical validation are separate evidence levels. See `03_真实PCB呈现与KiCad参考.md` for source links, local-only fixture licensing and remaining limits.
 
 Final automated result: **39 passed**, including a complete asynchronous 3D loader/rasterizer lifecycle. Packaged STEP conversion and a packaged real-board 3D software-render capture succeeded. The native macOS GPU viewport was started, but its final visual inspection was interrupted by the Mac locking; GPU visual acceptance is still pending and is not included in the automated pass count. Windows/Linux GUI and model-loader smoke checks have not been run here.
+
+## SwiftUI migration (2026-10-17)
+
+- Python suite: **42 passed**, including native geometry/binary contracts and rejection of a changed PCB before solving.
+- Native Swift contract/process checks: **11 passed** (version rejection, millimetre pan/zoom mapping, invalid coordinates, truncated mesh, mismatched board identity, Unicode progress, nonzero worker exit, cancellation).
+- SwiftUI release build and complete native app packaging succeeded using Command Line Tools. The bundle is locally ad-hoc signed; signature verification passed.
+- Production Metal renderer, on the current Apple M4 GPU: the actual StickHub export rendered **995,544 vertices**, with **86/93 model references** loaded. Missing/read-warning limits remain explicit. This is genuine Metal GPU rendering, not a Qt software screenshot.
+- The real SwiftUI window was opened through the native UI tool. “打开合成演示板” imported source/config; “开始供电分析” completed through the bundled engine; accessibility output showed **U1.1, 3.292066 V, threshold 3.2950, 低于设定值**. This matches the numerical engine.
+- ScreenCaptureKit failed with stream errors during attempted window screenshots. Screenshot-level visual acceptance and the remaining native file dialogs/3D gestures are not claimed complete on this host. GPU texture rendering and window import/analysis controls are verified separately.
+- No measured-board accuracy calibration, Intel Mac validation or Windows/Linux native SwiftUI port is claimed. Existing cross-platform core checks remain configured independently.

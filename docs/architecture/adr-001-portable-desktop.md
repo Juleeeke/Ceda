@@ -37,3 +37,7 @@ Contact faces are fragmented into the conductor mesh, since assigning an equipot
 ## Sources
 
 [Qt for Python](https://doc.qt.io/qtforpython-6/), [Gmsh](https://gmsh.info/), [KiCad file format](https://dev-docs.kicad.org/en/file-formats/sexpr-pcb/), [SciPy sparse solvers](https://docs.scipy.org/doc/scipy/reference/sparse.linalg.html), [ngspice](https://ngspice.sourceforge.io/shared.html).
+
+## Follow-up decision (2026-10-17)
+
+The user's request to move the macOS interface to SwiftUI is implemented in [ADR-002](adr-002-swiftui-macos.md). macOS now has a preferred native client, while the independent numerical core and cross-platform artifact contracts remain unchanged. Qt remains a separate client option rather than the macOS native frontend.

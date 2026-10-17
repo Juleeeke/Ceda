@@ -23,6 +23,11 @@ def main(argv=None):
     gui.add_argument('--model-library')
     model_mesh = sub.add_parser('model-mesh',help='Internal isolated STEP display tessellation')
     model_mesh.add_argument('source');model_mesh.add_argument('output')
+    for command in ('native-export','native-mesh'):
+        native=sub.add_parser(command,help='Versioned native frontend geometry contract')
+        native.add_argument('board');native.add_argument('--output',required=True)
+        native.add_argument('--expected-board-sha')
+        if command=='native-mesh':native.add_argument('--model-library')
     inspect = sub.add_parser("inspect",help="Inspect actual KiCad PCB geometry")
     inspect.add_argument("board")
     inspect.add_argument("--netlist")
@@ -32,6 +37,7 @@ def main(argv=None):
         analyze.add_argument("--config",required=True)
         analyze.add_argument("--output",required=True)
         analyze.add_argument("--netlist")
+        analyze.add_argument('--expected-board-sha')
     demo = sub.add_parser("demo",help="Run the supplied synthetic copper-neck example")
     demo.add_argument("--output",default="outputs/demo")
     spice = sub.add_parser("transient",help="Run optional single-port layout-R / RC startup analysis")
@@ -53,6 +59,20 @@ def main(argv=None):
             np.savez_compressed(args.output,triangles=triangles,colors=colors)
             return 0
         from .kicad import load_board
+        if args.command in ('native-export','native-mesh'):
+            import signal
+            def cancelled(signum,frame):raise KeyboardInterrupt('Native job cancelled')
+            signal.signal(signal.SIGTERM,cancelled)
+            from .native import export_board,export_mesh
+            board=load_board(args.board)
+            if args.expected_board_sha and board.sha256!=args.expected_board_sha:
+                raise CedaError('PCB 文件在导入后已经改变，请重新导入后再运行。')
+            def native_progress(message):
+                print(json.dumps({'event':'progress','message':message},ensure_ascii=False),flush=True)
+            if args.command=='native-export':export_board(board,args.output)
+            else:export_mesh(board,args.output,args.model_library,native_progress)
+            print(json.dumps({'event':'complete','output':args.output}),flush=True)
+            return 0
         if args.command == "inspect":
             board = load_board(args.board)
             data = board.summary()
@@ -76,6 +96,8 @@ def main(argv=None):
         else:
             board = load_board(args.board)
             config = AnalysisConfig.read(args.config)
+            if args.expected_board_sha and board.sha256!=args.expected_board_sha:
+                raise CedaError('PCB 文件在导入后已经改变，请重新导入后再运行。')
         comparison = None
         if getattr(args,"netlist",None):
             from .netlist import compare_netlist

@@ -1,10 +1,19 @@
 # Ceda
 
-跨平台、本地运行的 KiCad 后布局供电分析工作台。macOS / Apple Silicon 为当前首发验证平台，Qt/PySide6 桌面与 Python 计算核心同样面向 Windows/Linux。
+本地运行的 KiCad 后布局供电分析工作台。macOS / Apple Silicon 首选原生 **SwiftUI + Canvas + Metal** 客户端；Python 解析与仿真内核保持独立和跨平台，Qt 客户端仍可用于 Windows/Linux。
 
 当前版本 **0.1.0**：真实铜几何导入、2.5D 有限元 DC 供电/回流分析、两级网格复核、布局定位与可复现报告。提供实验性板级热扩散与电热迭代、单端口布局电阻回注 ngspice 的 RC 上电/负载瞬态。详见 [能力边界](docs/CAPABILITIES.md)。
 
-## 开始使用
+## macOS 原生 SwiftUI 版本
+
+```sh
+uv sync --extra dev
+.venv/bin/python scripts/build_macos.py
+```
+
+打开 `dist/Ceda SwiftUI.app`。应用包包含独立仿真内核，无需在用户机器安装 Python 环境。支持真实 PCB 二维/三维查看、工况编辑、运行/取消及报告导出。最低 macOS 14，当前验证为 Apple Silicon。详见 [原生客户端](native/macos/README.md) 和 [SwiftUI 架构决策](docs/architecture/adr-002-swiftui-macos.md)。
+
+## Python CLI / 跨平台 Qt 客户端
 
 需要 Python 3.11 或更新版本。
 

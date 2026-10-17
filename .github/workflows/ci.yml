@@ -1,6 +1,14 @@
 name: Cross-platform core and desktop checks
 on: [push, pull_request]
 jobs:
+  native-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native SwiftUI client and protocol checker
+        run: swift build --package-path native/macos -c release
+      - name: Native protocol, worker progress and cancellation checks
+        run: native/macos/.build/release/CedaContractChecks
   test:
     strategy:
       fail-fast: false

@@ -159,10 +159,13 @@ def isolated_step_mesh(path,cancelled=lambda:False):
             process=subprocess.Popen(command,stdout=stream,stderr=subprocess.STDOUT,
                 env=dict(os.environ,OMP_NUM_THREADS='1'))
             deadline=time.monotonic()+90
-            while process.poll() is None:
-                if cancelled() or time.monotonic()>deadline:
-                    process.kill();process.wait();raise CedaError('STEP 读取已取消或超时。')
-                time.sleep(0.05)
+            try:
+                while process.poll() is None:
+                    if cancelled() or time.monotonic()>deadline:
+                        raise CedaError('STEP 读取已取消或超时。')
+                    time.sleep(0.05)
+            finally:
+                if process.poll() is None:process.kill();process.wait()
         diagnostics=log.read_text(encoding='utf-8',errors='replace')
         if process.returncode or not output.is_file():
             raise CedaError(f'STEP 独立读取进程失败 ({process.returncode})：{diagnostics[-300:]}')

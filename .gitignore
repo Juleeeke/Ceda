@@ -9,3 +9,5 @@ dist/
 .uv-cache/
 outputs/
 *.ceda-run/
+native/macos/.build/
+native/macos/.swiftpm/
